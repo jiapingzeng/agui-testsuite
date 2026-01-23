@@ -1,6 +1,6 @@
 import * as dotenv from 'dotenv';
-import { AgentSetup, SetupResult } from './utils/AgentSetup';
-import { AwsCredentialsHelper } from './utils/AwsCredentials';
+import { AgentSetup, SetupResult } from './setup/AgentSetup';
+import { AwsCredentialsHelper } from './setup/AwsCredentials';
 import { TestRunner } from './utils/TestRunner';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -11,6 +11,7 @@ dotenv.config();
 // Parse command line arguments
 const args = process.argv.slice(2);
 const mode = args[0] || 'default';
+const parallel = args.includes('--parallel');
 
 const ENV_FILE = path.join(process.cwd(), '.env');
 
@@ -100,49 +101,53 @@ async function runTests(result: SetupResult, testMode: 'all' | 'openai' | 'bedro
   console.log('🧪 Running Tests');
   console.log('═══════════════════════════════════════════');
 
-  const { testConfig } = await import('./tests/list-indices.test');
-  const runner = new TestRunner();
+  // Discover all test files
+  const testsDir = path.join(__dirname, 'tests');
+  const testFiles = fs.readdirSync(testsDir).filter(file => file.endsWith('.test.ts') || file.endsWith('.test.js'));
 
+  console.log(`\nFound ${testFiles.length} test file(s)\n`);
+
+  const runner = new TestRunner();
   const tests = [];
 
-  if (testMode === 'all' || testMode === 'openai') {
-    tests.push({
-      name: testConfig.name,
-      agentId: result.openai.agentId,
-      modelType: 'openai' as const,
-      payload: testConfig.payload,
-    });
+  // Load and prepare all test configs
+  for (const testFile of testFiles) {
+    const testModule = await import(`./tests/${testFile}`);
+    const testConfig = testModule.testConfig;
+
+    if (!testConfig) {
+      console.warn(`⚠️  Skipping ${testFile}: no testConfig export found`);
+      continue;
+    }
+
+    if (testMode === 'all' || testMode === 'openai') {
+      tests.push({
+        name: testConfig.name,
+        agentId: result.openai.agentId,
+        modelType: 'openai' as const,
+        payload: testConfig.payload,
+      });
+    }
+
+    if (testMode === 'all' || testMode === 'bedrock') {
+      tests.push({
+        name: testConfig.name,
+        agentId: result.bedrock.agentId,
+        modelType: 'bedrock' as const,
+        payload: testConfig.payload,
+      });
+    }
   }
 
-  if (testMode === 'all' || testMode === 'bedrock') {
-    tests.push({
-      name: testConfig.name,
-      agentId: result.bedrock.agentId,
-      modelType: 'bedrock' as const,
-      payload: testConfig.payload,
-    });
+  if (parallel) {
+    console.log('⚡ Running tests in parallel...\n');
   }
-
-  const results = await runner.runMultipleTests(tests);
+  
+  const results = await runner.runMultipleTests(tests, parallel);
 
   // Print summary
-  console.log('\n═══════════════════════════════════════════');
-  console.log('📊 Test Summary');
-  console.log('═══════════════════════════════════════════');
-  const totalTests = results.length;
-  const passedTests = results.filter(r => r.passed).length;
-  const failedTests = totalTests - passedTests;
-  const totalDuration = results.reduce((sum, r) => sum + r.duration, 0);
-  console.log(`Total Tests: ${totalTests}`);
-  console.log(`✓ Passed: ${passedTests}`);
-  console.log(`✗ Failed: ${failedTests}`);
-  console.log(`⏱ Total Duration: ${totalDuration}ms`);
-  console.log('═══════════════════════════════════════════\n');
-
-  if (failedTests > 0) {
-    console.error('Some tests failed');
-    process.exit(1);
-  }
+  const { TestSummary } = await import('./utils/TestSummary');
+  TestSummary.print(results);
 }
 
 async function main() {

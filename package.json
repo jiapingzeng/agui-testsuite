@@ -5,11 +5,12 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "start": "ts-node src/index.ts",
+    "start": "ts-node src/index.ts --parallel",
     "setup": "ts-node src/index.ts --setup-only",
-    "test:openai": "ts-node src/index.ts --test-openai",
-    "test:bedrock": "ts-node src/index.ts --test-bedrock",
-    "test:all": "ts-node src/index.ts --test-all",
+    "test:openai": "ts-node src/index.ts --test-openai --parallel",
+    "test:bedrock": "ts-node src/index.ts --test-bedrock --parallel",
+    "test:all": "ts-node src/index.ts --test-all --parallel",
+    "clean": "rm -rf outputs/*",
     "build": "tsc",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write \"src/**/*.ts\""
@@ -35,6 +36,7 @@
   },
   "dependencies": {
     "@opensearch-project/opensearch": "^2.5.0",
+    "cli-table3": "^0.6.5",
     "dotenv": "^16.3.1"
   }
 }
