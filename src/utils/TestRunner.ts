@@ -23,6 +23,8 @@ export interface TestResult {
 
 export class TestRunner {
   private outputDir: string;
+  private isParallelMode: boolean = false;
+  private outputBuffer: string[] = [];
 
   constructor(outputDir: string = 'outputs') {
     this.outputDir = path.join(process.cwd(), outputDir);
@@ -31,12 +33,29 @@ export class TestRunner {
     }
   }
 
+  private log(message: string): void {
+    if (this.isParallelMode) {
+      this.outputBuffer.push(message);
+    } else {
+      console.log(message);
+    }
+  }
+
+  private flushBuffer(): void {
+    if (this.outputBuffer.length > 0) {
+      console.log(this.outputBuffer.join('\n'));
+      this.outputBuffer = [];
+    }
+  }
+
   async runTest(config: TestConfig): Promise<TestResult> {
     const startTime = Date.now();
     const testName = `${config.name} (${config.modelType})`;
     
     try {
-      console.log(`\n▶ Running: ${testName}`);
+      this.log(`\n${'═'.repeat(60)}`);
+      this.log(`${Colors.bold('▶ RUNNING:')} ${Colors.cyan(testName)}`);
+      this.log('═'.repeat(60));
       
       const executor = new AgentExecutor();
       const response = await executor.execute({
@@ -54,26 +73,26 @@ export class TestRunner {
       const runError = this.extractRunError(response.body);
       
       if (accumulatedText) {
-        console.log(`\n  ${Colors.bold('Accumulated Response:')}`);
-        console.log(`  ${Colors.cyan(accumulatedText)}\n`);
+        this.log(`\n${Colors.bold('📝 Accumulated Response:')}`);
+        this.log(`${Colors.cyan(accumulatedText)}\n`);
       }
       
       if (runError) {
-        console.log(`  ${Colors.bold('Run Error:')}`);
-        console.log(`  ${Colors.error(runError)}\n`);
+        this.log(`${Colors.bold('⚠️  Run Error:')}`);
+        this.log(`${Colors.error(runError)}\n`);
       }
 
       // Print validation results
       const validationLabel = validation.isValid ? Colors.success('✓ VALID') : Colors.error('✗ INVALID');
-      console.log(`  ${Colors.bold('Stream Validation:')} ${validationLabel}`);
-      console.log(`    RUN_STARTED: ${validation.stats.runStartedCount} ${Colors.info('(expected 1)')}`);
-      console.log(`    RUN_FINISHED: ${validation.stats.runFinishedCount}, RUN_ERROR: ${validation.stats.runErrorCount} ${Colors.info('(expected 1 total)')}`);
-      console.log(`    Message pairs: ${validation.stats.messageCount}`);
-      console.log(`    Orphaned content: ${validation.stats.orphanedContent}`);
+      this.log(`${Colors.bold('🔍 Stream Validation:')} ${validationLabel}`);
+      this.log(`  RUN_STARTED: ${validation.stats.runStartedCount} ${Colors.info('(expected 1)')}`);
+      this.log(`  RUN_FINISHED: ${validation.stats.runFinishedCount}, RUN_ERROR: ${validation.stats.runErrorCount} ${Colors.info('(expected 1 total)')}`);
+      this.log(`  Message pairs: ${validation.stats.messageCount}`);
+      this.log(`  Orphaned content: ${validation.stats.orphanedContent}`);
       
       if (!validation.isValid) {
-        console.log(`  ${Colors.warning('Validation Errors:')}`);
-        validation.errors.forEach(err => console.log(`    ${Colors.error('-')} ${err}`));
+        this.log(`${Colors.warning('⚠️  Validation Errors:')}`);
+        validation.errors.forEach(err => this.log(`  ${Colors.error('-')} ${err}`));
       }
 
       // Save response to file
@@ -83,8 +102,12 @@ export class TestRunner {
       const testPassed = response.statusCode === 200 && validation.isValid && validation.stats.runErrorCount === 0;
 
       if (testPassed) {
-        console.log(`\n${Colors.success('✓ Test passed:')} ${testName} ${Colors.info(`(${duration}ms)`)}`);
-        console.log(`  Output saved to: ${outputFile}`);
+        this.log(`\n${Colors.success('✅ TEST PASSED')} ${Colors.info(`(${duration}ms)`)}`);
+        this.log(`📁 Output saved to: ${Colors.info(outputFile)}`);
+        this.log('═'.repeat(60));
+        
+        this.flushBuffer();
+        
         return {
           name: testName,
           modelType: config.modelType,
@@ -94,12 +117,16 @@ export class TestRunner {
           outputFile,
         };
       } else {
-        console.log(`\n${Colors.error('✗ Test failed:')} ${testName} ${Colors.info(`(${duration}ms)`)}`);
+        this.log(`\n${Colors.error('❌ TEST FAILED')} ${Colors.info(`(${duration}ms)`)}`);
         const errorMessage = response.statusCode !== 200 
           ? `Status code: ${response.statusCode}` 
           : `Validation failed: ${validation.errors.join(', ')}`;
-        console.log(`  ${Colors.warning('Reason:')} ${errorMessage}`);
-        console.log(`  Output saved to: ${outputFile}`);
+        this.log(`${Colors.warning('Reason:')} ${errorMessage}`);
+        this.log(`📁 Output saved to: ${Colors.info(outputFile)}`);
+        this.log('═'.repeat(60));
+        
+        this.flushBuffer();
+        
         return {
           name: testName,
           modelType: config.modelType,
@@ -112,8 +139,12 @@ export class TestRunner {
       }
     } catch (error) {
       const duration = Date.now() - startTime;
-      console.log(`\n${Colors.error('✗ Test failed:')} ${testName} ${Colors.info(`(${duration}ms)`)}`);
-      console.log(`  ${Colors.error('Error:')} ${error}`);
+      this.log(`\n${Colors.error('❌ TEST FAILED')} ${Colors.info(`(${duration}ms)`)}`);
+      this.log(`${Colors.error('Error:')} ${error}`);
+      this.log('═'.repeat(60));
+      
+      this.flushBuffer();
+      
       return {
         name: testName,
         modelType: config.modelType,
@@ -241,11 +272,31 @@ export class TestRunner {
 
   async runMultipleTests(tests: TestConfig[], parallel: boolean = false): Promise<TestResult[]> {
     if (parallel) {
-      // Run tests in parallel
-      const results = await Promise.all(tests.map(test => this.runTest(test)));
+      this.isParallelMode = true;
+      
+      // Print initial status for all tests
+      console.log(Colors.bold('\n📋 Tests Queued:'));
+      tests.forEach((test, index) => {
+        console.log(`  ${index + 1}. ${test.name} (${test.modelType})`);
+      });
+      console.log('');
+      
+      const absoluteOutputDir = this.outputDir;
+      
+      // Run tests in parallel with individual buffering
+      const results = await Promise.all(
+        tests.map(async (test) => {
+          const testRunner = new TestRunner();
+          testRunner.outputDir = absoluteOutputDir;
+          testRunner.isParallelMode = true;
+          return testRunner.runTest(test);
+        })
+      );
+      
       return results;
     } else {
       // Run tests sequentially (default)
+      this.isParallelMode = false;
       const results: TestResult[] = [];
       
       for (const test of tests) {
