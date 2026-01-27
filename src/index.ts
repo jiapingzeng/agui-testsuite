@@ -15,6 +15,9 @@ const mode = args[0] || 'default';
 const parallel = !args.includes('--sequential'); // Parallel is default, --sequential disables it
 const useRevampSetup = args.includes('--revamp'); // Use revamp setup for Bedrock when enabled
 
+// Parse specific test names (any args that don't start with --)
+const specificTests = args.filter(arg => !arg.startsWith('--') && arg !== mode);
+
 const ENV_FILE = path.join(process.cwd(), '.env');
 
 interface CombinedSetupResult {
@@ -168,14 +171,37 @@ async function loadSetup(): Promise<CombinedSetupResult> {
   };
 }
 
-async function runTests(result: CombinedSetupResult, testMode: 'all' | 'openai' | 'bedrock') {
+async function runTests(result: CombinedSetupResult, testMode: 'all' | 'openai' | 'bedrock', specificTests?: string[]) {
   console.log('═══════════════════════════════════════════');
   console.log('🧪 Running Tests');
   console.log('═══════════════════════════════════════════');
 
   // Discover all test files
   const testsDir = path.join(__dirname, 'tests');
-  const testFiles = fs.readdirSync(testsDir).filter(file => file.endsWith('.test.ts') || file.endsWith('.test.js'));
+  let testFiles = fs.readdirSync(testsDir).filter(file => file.endsWith('.test.ts') || file.endsWith('.test.js'));
+
+  // Filter test files if specific tests are requested
+  if (specificTests && specificTests.length > 0) {
+    const requestedTestNames = specificTests.map(t => t.toLowerCase());
+    testFiles = testFiles.filter(file => {
+      const baseName = file.replace(/\.test\.(ts|js)$/, '').toLowerCase();
+      return requestedTestNames.some(requested =>
+        baseName.includes(requested) || requested.includes(baseName)
+      );
+    });
+
+    if (testFiles.length === 0) {
+      console.error(`\n❌ No test files found matching: ${specificTests.join(', ')}`);
+      console.log('\nAvailable tests:');
+      const allFiles = fs.readdirSync(testsDir).filter(file => file.endsWith('.test.ts') || file.endsWith('.test.js'));
+      allFiles.forEach(file => {
+        console.log(`  - ${file.replace(/\.test\.(ts|js)$/, '')}`);
+      });
+      process.exit(1);
+    }
+
+    console.log(`\n🎯 Running specific test(s): ${specificTests.join(', ')}`);
+  }
 
   console.log(`\nFound ${testFiles.length} test file(s)\n`);
 
@@ -216,7 +242,7 @@ async function runTests(result: CombinedSetupResult, testMode: 'all' | 'openai' 
   } else {
     console.log('📝 Running tests sequentially...\n');
   }
-  
+
   const results = await runner.runMultipleTests(tests, parallel);
 
   // Print summary
@@ -233,24 +259,24 @@ async function main() {
 
       case '--test-openai':
         const setupOpenai = await loadSetup();
-        await runTests(setupOpenai, 'openai');
+        await runTests(setupOpenai, 'openai', specificTests.length > 0 ? specificTests : undefined);
         break;
 
       case '--test-bedrock':
         const setupBedrock = await loadSetup();
-        await runTests(setupBedrock, 'bedrock');
+        await runTests(setupBedrock, 'bedrock', specificTests.length > 0 ? specificTests : undefined);
         break;
 
       case '--test-all':
         const setupAll = await loadSetup();
-        await runTests(setupAll, 'all');
+        await runTests(setupAll, 'all', specificTests.length > 0 ? specificTests : undefined);
         break;
 
       case 'default':
       default:
         // Full run: setup + test all
         const result = await runSetup();
-        await runTests(result, 'all');
+        await runTests(result, 'all', specificTests.length > 0 ? specificTests : undefined);
         break;
     }
 

@@ -108,7 +108,7 @@ export class AgentSetup {
         'plugins.ml_commons.stream_enabled': true,
         'plugins.ml_commons.mcp_connector_enabled': true,
         'plugins.ml_commons.ag_ui_enabled': true,
-        'plugins.ml_commons.simplified_agent_registration_enabled': true,
+        'plugins.ml_commons.unified_agent_api_enabled': true,
         'logger.org.opensearch.ml': 'DEBUG'
       }
     });
@@ -262,12 +262,12 @@ export class AgentSetup {
         model_id: modelId,
         parameters: {
           max_iteration: 50,
-          system_prompt: 'You are a helpful assistant. Use the available tools to help users. When you need to perform an action, use the appropriate tool by calling it with the correct parameters.',
+          system_prompt: 'You are a helpful assistant and an expert in OpenSearch. You are currently in OpenSearch Dashboards and have access to both frontend and backend tools. These are frontend tools: [${parameters.agui_tool_names}] and these are backend tools: [${parameters.backend_tool_names}]. Use frontend tools if you need to update UI, otherwise use backend tools for data access. Use one tool at a time. You have access to the entire conversation between you and the user and current frontend context; take context into consideration and provide a concise answer to the lastest user question. When using ListIndexTool, use include_details false when the input is an index pattern or wildcard. When using IndexMappingTool, try not to use index patterns or wildcards as input. Instead, you can first list indices with include_details false to understand what indices are included in the pattern, then get index mapping of specific indices. When using SearchIndexTool, use pagination where possible so that the result is not too large.',
           prompt: 'Context:${parameters.context}\nQuestion:${parameters.question}'
         }
       },
       memory: {
-        type: 'conversation_index'
+        type: 'CONVERSATION_INDEX'
       },
       parameters: {
         _llm_interface: modelType === 'openai' ? 'openai/v1/chat/completions' : 'bedrock/converse/claude',
