@@ -108,6 +108,7 @@ export class AgentSetup {
         'plugins.ml_commons.stream_enabled': true,
         'plugins.ml_commons.mcp_connector_enabled': true,
         'plugins.ml_commons.ag_ui_enabled': true,
+        'plugins.ml_commons.simplified_agent_registration_enabled': true,
         'logger.org.opensearch.ml': 'DEBUG'
       }
     });

@@ -13,6 +13,7 @@ dotenv.config();
 const args = process.argv.slice(2);
 const mode = args[0] || 'default';
 const parallel = !args.includes('--sequential'); // Parallel is default, --sequential disables it
+const useRevampSetup = args.includes('--revamp'); // Use revamp setup for Bedrock when enabled
 
 const ENV_FILE = path.join(process.cwd(), '.env');
 
@@ -22,6 +23,7 @@ interface CombinedSetupResult {
     agentId: string;
   };
   bedrock: {
+    modelId?: string;
     agentId: string;
   };
   mcpConnectorId: string;
@@ -43,42 +45,75 @@ async function runSetup(): Promise<CombinedSetupResult> {
   const awsCredentials = await AwsCredentialsHelper.getCredentials(awsAccount);
   AwsCredentialsHelper.setEnvironmentVariables(awsCredentials);
 
-  // Run legacy setup for OpenAI
-  const legacySetup = new AgentSetup({
-    openaiKey,
-    awsAccessKeyId: awsCredentials.accessKeyId,
-    awsSecretAccessKey: awsCredentials.secretAccessKey,
-    awsSessionToken: awsCredentials.sessionToken,
-    mcpServerUrl: process.env.MCP_SERVER_URL,
-    opensearchEndpoint: process.env.OPENSEARCH_ENDPOINT,
-  });
+  if (useRevampSetup) {
+    console.log('🔄 Using revamp setup for Bedrock, legacy setup for OpenAI\n');
+    
+    // Run legacy setup for OpenAI
+    const legacySetup = new AgentSetup({
+      openaiKey,
+      awsAccessKeyId: awsCredentials.accessKeyId,
+      awsSecretAccessKey: awsCredentials.secretAccessKey,
+      awsSessionToken: awsCredentials.sessionToken,
+      mcpServerUrl: process.env.MCP_SERVER_URL,
+      opensearchEndpoint: process.env.OPENSEARCH_ENDPOINT,
+    });
 
-  const legacyResult = await legacySetup.runFullSetup();
+    const legacyResult = await legacySetup.runFullSetup();
 
-  // Run revamp setup for Bedrock
-  const revampSetup = new AgentRevampSetup({
-    awsAccessKeyId: awsCredentials.accessKeyId,
-    awsSecretAccessKey: awsCredentials.secretAccessKey,
-    awsSessionToken: awsCredentials.sessionToken,
-    mcpServerUrl: process.env.MCP_SERVER_URL,
-    opensearchEndpoint: process.env.OPENSEARCH_ENDPOINT,
-  });
+    // Run revamp setup for Bedrock
+    const revampSetup = new AgentRevampSetup({
+      awsAccessKeyId: awsCredentials.accessKeyId,
+      awsSecretAccessKey: awsCredentials.secretAccessKey,
+      awsSessionToken: awsCredentials.sessionToken,
+      mcpServerUrl: process.env.MCP_SERVER_URL,
+      opensearchEndpoint: process.env.OPENSEARCH_ENDPOINT,
+    });
 
-  const revampResult = await revampSetup.runFullSetup();
+    const revampResult = await revampSetup.runFullSetup();
 
-  // Combine results
-  const result: CombinedSetupResult = {
-    openai: legacyResult.openai,
-    bedrock: {
-      agentId: revampResult.bedrock.agentId,
-    },
-    mcpConnectorId: legacyResult.mcpConnectorId,
-  };
+    // Combine results
+    const result: CombinedSetupResult = {
+      openai: legacyResult.openai,
+      bedrock: {
+        agentId: revampResult.bedrock.agentId,
+      },
+      mcpConnectorId: legacyResult.mcpConnectorId,
+    };
 
-  saveSetupToEnv(result);
-  console.log(`\n💾 Setup saved to: ${ENV_FILE}\n`);
+    saveSetupToEnv(result);
+    console.log(`\n💾 Setup saved to: ${ENV_FILE}\n`);
 
-  return result;
+    return result;
+  } else {
+    console.log('🔧 Using legacy setup for both OpenAI and Bedrock\n');
+    
+    // Run legacy setup for both OpenAI and Bedrock
+    const legacySetup = new AgentSetup({
+      openaiKey,
+      awsAccessKeyId: awsCredentials.accessKeyId,
+      awsSecretAccessKey: awsCredentials.secretAccessKey,
+      awsSessionToken: awsCredentials.sessionToken,
+      mcpServerUrl: process.env.MCP_SERVER_URL,
+      opensearchEndpoint: process.env.OPENSEARCH_ENDPOINT,
+    });
+
+    const legacyResult = await legacySetup.runFullSetup();
+
+    // Use legacy result for both
+    const result: CombinedSetupResult = {
+      openai: legacyResult.openai,
+      bedrock: {
+        modelId: legacyResult.bedrock.modelId,
+        agentId: legacyResult.bedrock.agentId,
+      },
+      mcpConnectorId: legacyResult.mcpConnectorId,
+    };
+
+    saveSetupToEnv(result);
+    console.log(`\n💾 Setup saved to: ${ENV_FILE}\n`);
+
+    return result;
+  }
 }
 
 function saveSetupToEnv(result: CombinedSetupResult): void {
@@ -95,6 +130,12 @@ function saveSetupToEnv(result: CombinedSetupResult): void {
   // Append new agent IDs
   envContent += `OPENAI_MODEL_ID=${result.openai.modelId}\n`;
   envContent += `OPENAI_AGENT_ID=${result.openai.agentId}\n`;
+  
+  // Only add BEDROCK_MODEL_ID if present (legacy setup)
+  if (result.bedrock.modelId) {
+    envContent += `BEDROCK_MODEL_ID=${result.bedrock.modelId}\n`;
+  }
+  
   envContent += `BEDROCK_AGENT_ID=${result.bedrock.agentId}\n`;
   envContent += `MCP_CONNECTOR_ID=${result.mcpConnectorId}\n`;
   
