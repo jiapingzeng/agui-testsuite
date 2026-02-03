@@ -1,4 +1,5 @@
 import * as dotenv from 'dotenv';
+import { OpenSearchClient } from '../utils/OpenSearchClient';
 
 dotenv.config();
 
@@ -24,34 +25,18 @@ export interface SetupResult {
 }
 
 export class AgentSetup {
-  private endpoint: string;
+  private client: OpenSearchClient;
   private config: SetupConfig;
 
   constructor(config: SetupConfig) {
-    this.endpoint = config.opensearchEndpoint || process.env.OPENSEARCH_ENDPOINT || 'http://localhost:9200';
+    this.client = new OpenSearchClient({
+      endpoint: config.opensearchEndpoint
+    });
     this.config = config;
   }
 
   private async request(method: string, path: string, body?: any): Promise<any> {
-    const url = `${this.endpoint}${path}`;
-    const options: RequestInit = {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    };
-
-    if (body) {
-      options.body = JSON.stringify(body);
-    }
-
-    const response = await fetch(url, options);
-    const data = await response.json();
-
-    return {
-      statusCode: response.status,
-      body: data,
-    };
+    return this.client.request({ method, path, body });
   }
 
   async runFullSetup(): Promise<SetupResult> {
