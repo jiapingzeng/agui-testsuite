@@ -39,13 +39,7 @@ async function runSetup(): Promise<CombinedSetupResult> {
     process.exit(1);
   }
 
-  const awsAccount = process.env.AWS_ACCOUNT;
-  if (!awsAccount) {
-    console.error('❌ Error: AWS_ACCOUNT is required in .env file');
-    process.exit(1);
-  }
-
-  const awsCredentials = await AwsCredentialsHelper.getCredentials(awsAccount);
+  const awsCredentials = await AwsCredentialsHelper.getCredentials();
   AwsCredentialsHelper.setEnvironmentVariables(awsCredentials);
 
   if (useRevampSetup) {
