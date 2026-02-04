@@ -212,6 +212,12 @@ async function runTests(result: CombinedSetupResult, testMode: 'all' | 'openai' 
       continue;
     }
 
+    // Skip tests marked as skip: true
+    if (testConfig.skip) {
+      console.log(`⏭️  Skipping ${testConfig.name} (marked as skip: true)`);
+      continue;
+    }
+
     if (testMode === 'all' || testMode === 'openai') {
       tests.push({
         name: testConfig.name,

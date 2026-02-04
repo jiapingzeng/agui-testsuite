@@ -1,5 +1,5 @@
 export const testConfig = {
-  name: 'Parallel Tools - Cluster Health and PPL',
+  name: 'Parallel Tool Results - Cluster Health and PPL',
   payload: {
     threadId: 'thread-2',
     runId: 'run-2',

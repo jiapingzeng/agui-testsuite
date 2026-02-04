@@ -95,8 +95,7 @@ export class AgentSetup {
         'plugins.ml_commons.stream_enabled': true,
         'plugins.ml_commons.mcp_connector_enabled': true,
         'plugins.ml_commons.ag_ui_enabled': true,
-        'plugins.ml_commons.unified_agent_api_enabled': true,
-        'logger.org.opensearch.ml': 'DEBUG'
+        'plugins.ml_commons.unified_agent_api_enabled': true
       }
     });
 
@@ -111,17 +110,17 @@ export class AgentSetup {
     console.log('▶ Step 2: Registering OpenAI model...');
 
     const response = await this.request('POST', '/_plugins/_ml/models/_register?deploy=true', {
-      name: 'openai gpt 3.5 turbo',
+      name: 'openai gpt 4o',
       function_name: 'remote',
       description: 'openai model',
       connector: {
         name: 'OpenAI Chat Connector',
-        description: 'The connector to public OpenAI model service for GPT 3.5',
+        description: 'The connector to public OpenAI model service for GPT 4o',
         version: 1,
         protocol: 'http',
         parameters: {
           endpoint: 'api.openai.com',
-          model: 'gpt-3.5-turbo'
+          model: 'gpt-4o'
         },
         credential: {
           openAI_key: this.config.openaiKey
