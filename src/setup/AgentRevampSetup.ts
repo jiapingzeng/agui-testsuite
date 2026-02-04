@@ -65,10 +65,12 @@ export class AgentRevampSetup {
   async enableFeatures(): Promise<void> {
     console.log('▶ Step 1: Enabling feature flags...');
 
+    const mcpUrl = this.config.mcpServerUrl || process.env.MCP_SERVER_URL || 'http://localhost:3030';
+
     const response = await this.request('PUT', '/_cluster/settings', {
       persistent: {
         'plugins.ml_commons.trusted_connector_endpoints_regex': [
-          'http://localhost:3030',
+          mcpUrl,
           '^https://bedrock-runtime\\..*[a-z0-9-]\\.amazonaws\\.com/.*$',
           '^https://api\\.openai\\.com/.*$'
         ],

@@ -4,6 +4,7 @@ dotenv.config();
 
 export interface OpenSearchClientConfig {
   endpoint?: string;
+  rejectUnauthorized?: boolean;
 }
 
 export interface RequestOptions {
@@ -22,6 +23,15 @@ export class OpenSearchClient {
 
   constructor(config?: OpenSearchClientConfig) {
     this.endpoint = config?.endpoint || process.env.OPENSEARCH_ENDPOINT || 'http://localhost:9200';
+    
+    // Disable SSL verification for test environments with self-signed certificates
+    const rejectUnauthorized = config?.rejectUnauthorized !== undefined 
+      ? config.rejectUnauthorized 
+      : false;
+    
+    if (!rejectUnauthorized) {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    }
   }
 
   /**
