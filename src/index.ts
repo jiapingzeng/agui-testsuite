@@ -22,11 +22,9 @@ const ENV_FILE = path.join(process.cwd(), '.env');
 
 interface CombinedSetupResult {
   openai: {
-    modelId: string;
     agentId: string;
   };
   bedrock: {
-    modelId?: string;
     agentId: string;
   };
   mcpConnectorId: string;
@@ -43,21 +41,9 @@ async function runSetup(): Promise<CombinedSetupResult> {
   AwsCredentialsHelper.setEnvironmentVariables(awsCredentials);
 
   if (useRevampSetup) {
-    console.log('🔄 Using revamp setup for Bedrock, legacy setup for OpenAI\n');
+    console.log('🔄 Using revamp setup for both OpenAI and Bedrock\n');
     
-    // Run legacy setup for OpenAI
-    const legacySetup = new AgentSetup({
-      openaiKey,
-      awsAccessKeyId: awsCredentials.accessKeyId,
-      awsSecretAccessKey: awsCredentials.secretAccessKey,
-      awsSessionToken: awsCredentials.sessionToken,
-      mcpServerUrl: process.env.MCP_SERVER_URL,
-      opensearchEndpoint: process.env.OPENSEARCH_ENDPOINT,
-    });
-
-    const legacyResult = await legacySetup.runFullSetup();
-
-    // Run revamp setup for Bedrock
+    // Run revamp setup for both OpenAI and Bedrock
     const revampSetup = new AgentRevampSetup({
       awsAccessKeyId: awsCredentials.accessKeyId,
       awsSecretAccessKey: awsCredentials.secretAccessKey,
@@ -68,13 +54,15 @@ async function runSetup(): Promise<CombinedSetupResult> {
 
     const revampResult = await revampSetup.runFullSetup();
 
-    // Combine results
+    // Map revamp results to combined format
     const result: CombinedSetupResult = {
-      openai: legacyResult.openai,
+      openai: {
+        agentId: revampResult.openai.agentId,
+      },
       bedrock: {
         agentId: revampResult.bedrock.agentId,
       },
-      mcpConnectorId: legacyResult.mcpConnectorId,
+      mcpConnectorId: revampResult.mcpConnectorId,
     };
 
     saveSetupToEnv(result);
@@ -98,9 +86,10 @@ async function runSetup(): Promise<CombinedSetupResult> {
 
     // Use legacy result for both
     const result: CombinedSetupResult = {
-      openai: legacyResult.openai,
+      openai: {
+        agentId: legacyResult.openai.agentId,
+      },
       bedrock: {
-        modelId: legacyResult.bedrock.modelId,
         agentId: legacyResult.bedrock.agentId,
       },
       mcpConnectorId: legacyResult.mcpConnectorId,
@@ -117,22 +106,13 @@ function saveSetupToEnv(result: CombinedSetupResult): void {
   let envContent = fs.readFileSync(ENV_FILE, 'utf-8');
   
   // Remove old agent IDs if they exist
-  envContent = envContent.replace(/^OPENAI_MODEL_ID=.*$/m, '');
   envContent = envContent.replace(/^OPENAI_AGENT_ID=.*$/m, '');
-  envContent = envContent.replace(/^BEDROCK_MODEL_ID=.*$/m, '');
   envContent = envContent.replace(/^BEDROCK_AGENT_ID=.*$/m, '');
   envContent = envContent.replace(/^MCP_CONNECTOR_ID=.*$/m, '');
   envContent = envContent.replace(/\n\n+/g, '\n\n');
   
   // Append new agent IDs
-  envContent += `OPENAI_MODEL_ID=${result.openai.modelId}\n`;
   envContent += `OPENAI_AGENT_ID=${result.openai.agentId}\n`;
-  
-  // Only add BEDROCK_MODEL_ID if present (legacy setup)
-  if (result.bedrock.modelId) {
-    envContent += `BEDROCK_MODEL_ID=${result.bedrock.modelId}\n`;
-  }
-  
   envContent += `BEDROCK_AGENT_ID=${result.bedrock.agentId}\n`;
   envContent += `MCP_CONNECTOR_ID=${result.mcpConnectorId}\n`;
   
@@ -142,9 +122,7 @@ function saveSetupToEnv(result: CombinedSetupResult): void {
 async function loadSetup(): Promise<CombinedSetupResult> {
   dotenv.config(); // Reload .env
   
-  const openaiModelId = process.env.OPENAI_MODEL_ID;
   const openaiAgentId = process.env.OPENAI_AGENT_ID;
-  const bedrockModelId = process.env.BEDROCK_MODEL_ID;
   const bedrockAgentId = process.env.BEDROCK_AGENT_ID;
   const mcpConnectorId = process.env.MCP_CONNECTOR_ID;
 
@@ -155,7 +133,6 @@ async function loadSetup(): Promise<CombinedSetupResult> {
 
   return {
     openai: {
-      modelId: openaiModelId!,
       agentId: openaiAgentId!,
     },
     bedrock: {

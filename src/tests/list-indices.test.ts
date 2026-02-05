@@ -1,5 +1,5 @@
 export const testConfig = {
-  name: 'Execute Agent - List Indices',
+  name: 'List Indices',
   payload: {
     threadId: 'thread-1',
     runId: 'run-1',

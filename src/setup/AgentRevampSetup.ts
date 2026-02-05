@@ -15,6 +15,9 @@ export interface SetupResult {
   bedrock: {
     agentId: string;
   };
+  openai: {
+    agentId: string;
+  };
   mcpConnectorId: string;
 }
 
@@ -34,17 +37,21 @@ export class AgentRevampSetup {
   }
 
   async runFullSetup(): Promise<SetupResult> {
-    console.log('\n🚀 Starting OpenSearch AI Agent Setup (Revamp - Bedrock only)...\n');
+    console.log('\n🚀 Starting OpenSearch AI Agent Setup (Revamp - Bedrock & OpenAI)...\n');
 
     try {
       await this.enableFeatures();
       
       const mcpConnectorId = await this.createMCPConnector();
       const bedrockAgentId = await this.registerBedrockAgent(mcpConnectorId);
+      const openaiAgentId = await this.registerOpenAIAgent(mcpConnectorId);
 
       const result: SetupResult = {
         bedrock: {
           agentId: bedrockAgentId,
+        },
+        openai: {
+          agentId: openaiAgentId,
         },
         mcpConnectorId,
       };
@@ -52,6 +59,7 @@ export class AgentRevampSetup {
       console.log('\n✅ Revamp setup completed successfully!');
       console.log('═══════════════════════════════════════════');
       console.log(`Bedrock Agent ID: ${result.bedrock.agentId}`);
+      console.log(`OpenAI Agent ID:  ${result.openai.agentId}`);
       console.log(`MCP Connector:    ${result.mcpConnectorId}`);
       console.log('═══════════════════════════════════════════\n');
 
@@ -153,6 +161,52 @@ export class AgentRevampSetup {
 
     const agentId = response.body.agent_id;
     console.log(`✓ Bedrock agent registered: ${agentId}\n`);
+
+    return agentId;
+  }
+
+  async registerOpenAIAgent(mcpConnectorId: string): Promise<string> {
+    console.log('▶ Step 4: Registering AG-UI agent with OpenAI model...');
+
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is required');
+    }
+
+    const response = await this.request('POST', '/_plugins/_ml/agents/_register', {
+      name: 'OpenAI Multimodal Agent',
+      type: 'AG_UI',
+      description: 'Test agent for OpenAI',
+      model: {
+        model_id: 'gpt-4o',
+        model_provider: 'openai/v1/chat/completions',
+        credential: {
+          openai_api_key: openaiApiKey
+        },
+        model_parameters: {
+          system_prompt: 'You are a helpful assistant and an expert in OpenSearch. You are currently in OpenSearch Dashboards and have access to both frontend and backend tools. These are frontend tools: [${parameters.agui_tool_names}] and these are backend tools: [${parameters.backend_tool_names}]. Use frontend tools if you need to update UI, otherwise use backend tools for data access. Use one tool at a time. You have access to the entire conversation between you and the user and current frontend context; take context into consideration and provide a concise answer to the lastest user question. When using ListIndexTool, use include_details false when the input is an index pattern or wildcard. When using IndexMappingTool, try not to use index patterns or wildcards as input. Instead, you can first list indices with include_details false to understand what indices are included in the pattern, then get index mapping of specific indices. When using SearchIndexTool, use pagination where possible so that the result is not too large.'
+        }
+      },
+      parameters: {
+        max_iteration: '50',
+        mcp_connectors: [
+          {
+            mcp_connector_id: mcpConnectorId
+          }
+        ]
+      },
+      tools: [],
+      memory: {
+        type: 'conversation_index'
+      }
+    });
+
+    if (response.statusCode !== 200) {
+      throw new Error(`Failed to register OpenAI agent: ${JSON.stringify(response.body)}`);
+    }
+
+    const agentId = response.body.agent_id;
+    console.log(`✓ OpenAI agent registered: ${agentId}\n`);
 
     return agentId;
   }
