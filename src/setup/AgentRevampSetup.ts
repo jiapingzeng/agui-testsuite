@@ -85,6 +85,7 @@ export class AgentRevampSetup {
         'plugins.ml_commons.stream_enabled': true,
         'plugins.ml_commons.mcp_connector_enabled': true,
         'plugins.ml_commons.ag_ui_enabled': true,
+        'plugins.ml_commons.unified_agent_api_enabled': true,
         'logger.org.opensearch.ml': 'DEBUG'
       }
     });
