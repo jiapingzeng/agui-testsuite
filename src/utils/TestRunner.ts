@@ -66,7 +66,7 @@ export class TestRunner {
       const duration = Date.now() - startTime;
 
       // Validate stream structure
-      const validation = StreamValidator.validate(response.body);
+      const validation = StreamValidator.validate(response.body, config.payload);
       
       // Parse and print accumulated text
       const accumulatedText = this.extractAccumulatedText(response.body);
@@ -89,6 +89,9 @@ export class TestRunner {
       this.log(`  RUN_FINISHED: ${validation.stats.runFinishedCount}, RUN_ERROR: ${validation.stats.runErrorCount} ${Colors.info('(expected 1 total)')}`);
       this.log(`  Message pairs: ${validation.stats.messageCount}`);
       this.log(`  Orphaned content: ${validation.stats.orphanedContent}`);
+      this.log(`  ThreadId mismatches: ${validation.stats.threadIdMismatches}`);
+      this.log(`  RunId mismatches: ${validation.stats.runIdMismatches}`);
+      this.log(`  MessageId inconsistencies: ${validation.stats.messageIdInconsistencies}`);
       
       if (!validation.isValid) {
         this.log(`${Colors.warning('⚠️  Validation Errors:')}`);

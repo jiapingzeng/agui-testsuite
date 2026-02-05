@@ -29,9 +29,9 @@ Required in `.env`:
 
 | Command | Description |
 |---------|-------------|
-| `npm start` | Setup agents and run all tests |
-| `npm run setup` | Create agents (legacy) |
-| `npm run setup:revamp` | Create agents (revamp setup for Bedrock, legacy for OpenAI) |
+| `npm start` | Setup agents (revamp) and run all tests |
+| `npm run setup` | Create agents using revamp setup |
+| `npm run setup:legacy` | Create agents using legacy setup (does not support multimodal) |
 | `npm test` | Test both agents (parallel) |
 | `npm run test:openai` | Test OpenAI agent only |
 | `npm run test:bedrock` | Test Bedrock agent only |

@@ -7,7 +7,7 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "setup": "ts-node src/index.ts --setup-only",
-    "setup:revamp": "ts-node src/index.ts --setup-only --revamp",
+    "setup:legacy": "ts-node src/index.ts --setup-only --legacy",
     "test:openai": "ts-node src/index.ts --test-openai",
     "test:bedrock": "ts-node src/index.ts --test-bedrock",
     "test": "ts-node src/index.ts --test-all",

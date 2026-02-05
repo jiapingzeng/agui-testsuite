@@ -253,7 +253,7 @@ export class AgentSetup {
         }
       },
       memory: {
-        type: 'CONVERSATION_INDEX'
+        type: 'conversation_index'
       },
       parameters: {
         _llm_interface: modelType === 'openai' ? 'openai/v1/chat/completions' : 'bedrock/converse/claude',

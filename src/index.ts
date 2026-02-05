@@ -13,7 +13,7 @@ dotenv.config();
 const args = process.argv.slice(2);
 const mode = args[0] || 'default';
 const parallel = !args.includes('--sequential'); // Parallel is default, --sequential disables it
-const useRevampSetup = args.includes('--revamp'); // Use revamp setup for Bedrock when enabled
+const useLegacySetup = args.includes('--legacy'); // Use legacy setup when explicitly requested
 
 // Parse specific test names (any args that don't start with --)
 const specificTests = args.filter(arg => !arg.startsWith('--') && arg !== mode);
@@ -40,8 +40,8 @@ async function runSetup(): Promise<CombinedSetupResult> {
   const awsCredentials = await AwsCredentialsHelper.getCredentials();
   AwsCredentialsHelper.setEnvironmentVariables(awsCredentials);
 
-  if (useRevampSetup) {
-    console.log('🔄 Using revamp setup for both OpenAI and Bedrock\n');
+  if (!useLegacySetup) {
+    console.log('🔄 Using revamp setup for both OpenAI and Bedrock (default)\n');
     
     // Run revamp setup for both OpenAI and Bedrock
     const revampSetup = new AgentRevampSetup({
