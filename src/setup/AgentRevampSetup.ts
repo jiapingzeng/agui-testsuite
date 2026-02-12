@@ -1,5 +1,6 @@
 import * as dotenv from 'dotenv';
 import { OpenSearchClient } from '../utils/OpenSearchClient';
+import { MemorySetup } from './MemorySetup';
 
 dotenv.config();
 
@@ -14,9 +15,11 @@ export interface SetupConfig {
 export interface SetupResult {
   bedrock: {
     agentId: string;
+    memoryContainerId: string;
   };
   openai: {
     agentId: string;
+    memoryContainerId: string;
   };
   mcpConnectorId: string;
 }
@@ -24,12 +27,14 @@ export interface SetupResult {
 export class AgentRevampSetup {
   private client: OpenSearchClient;
   private config: SetupConfig;
+  private memorySetup: MemorySetup;
 
   constructor(config: SetupConfig) {
     this.client = new OpenSearchClient({
       endpoint: config.opensearchEndpoint
     });
     this.config = config;
+    this.memorySetup = new MemorySetup(this.client);
   }
 
   private async request(method: string, path: string, body?: any): Promise<any> {
@@ -41,26 +46,30 @@ export class AgentRevampSetup {
 
     try {
       await this.enableFeatures();
-      
+
       const mcpConnectorId = await this.createMCPConnector();
-      const bedrockAgentId = await this.registerBedrockAgent(mcpConnectorId);
-      const openaiAgentId = await this.registerOpenAIAgent(mcpConnectorId);
+      const bedrockResult = await this.registerBedrockAgent(mcpConnectorId);
+      const openaiResult = await this.registerOpenAIAgent(mcpConnectorId);
 
       const result: SetupResult = {
         bedrock: {
-          agentId: bedrockAgentId,
+          agentId: bedrockResult.agentId,
+          memoryContainerId: bedrockResult.memoryContainerId,
         },
         openai: {
-          agentId: openaiAgentId,
+          agentId: openaiResult.agentId,
+          memoryContainerId: openaiResult.memoryContainerId,
         },
         mcpConnectorId,
       };
 
       console.log('\n✅ Revamp setup completed successfully!');
       console.log('═══════════════════════════════════════════');
-      console.log(`Bedrock Agent ID: ${result.bedrock.agentId}`);
-      console.log(`OpenAI Agent ID:  ${result.openai.agentId}`);
-      console.log(`MCP Connector:    ${result.mcpConnectorId}`);
+      console.log(`Bedrock Agent ID:         ${result.bedrock.agentId}`);
+      console.log(`Bedrock Memory Container: ${result.bedrock.memoryContainerId}`);
+      console.log(`OpenAI Agent ID:          ${result.openai.agentId}`);
+      console.log(`OpenAI Memory Container:  ${result.openai.memoryContainerId}`);
+      console.log(`MCP Connector:            ${result.mcpConnectorId}`);
       console.log('═══════════════════════════════════════════\n');
 
       return result;
@@ -123,8 +132,10 @@ export class AgentRevampSetup {
     return connectorId;
   }
 
-  async registerBedrockAgent(mcpConnectorId: string): Promise<string> {
+  async registerBedrockAgent(mcpConnectorId: string): Promise<{ agentId: string; memoryContainerId: string }> {
     console.log('▶ Step 3: Registering AG-UI agent with Bedrock model...');
+
+    const memoryContainerId = await this.memorySetup.createMemoryContainer('Bedrock Agent Memory Container');
 
     const response = await this.request('POST', '/_plugins/_ml/agents/_register', {
       name: 'AG-UI chat agent (Bedrock Revamp)',
@@ -152,7 +163,8 @@ export class AgentRevampSetup {
       },
       tools: [],
       memory: {
-        type: 'conversation_index'
+        type: "agentic_memory",
+        memory_container_id: memoryContainerId
       }
     });
 
@@ -163,16 +175,18 @@ export class AgentRevampSetup {
     const agentId = response.body.agent_id;
     console.log(`✓ Bedrock agent registered: ${agentId}\n`);
 
-    return agentId;
+    return { agentId, memoryContainerId };
   }
 
-  async registerOpenAIAgent(mcpConnectorId: string): Promise<string> {
+  async registerOpenAIAgent(mcpConnectorId: string): Promise<{ agentId: string; memoryContainerId: string }> {
     console.log('▶ Step 4: Registering AG-UI agent with OpenAI model...');
 
     const openaiApiKey = process.env.OPENAI_API_KEY;
     if (!openaiApiKey) {
       throw new Error('OPENAI_API_KEY environment variable is required');
     }
+
+    const memoryContainerId = await this.memorySetup.createMemoryContainer('OpenAI Agent Memory Container');
 
     const response = await this.request('POST', '/_plugins/_ml/agents/_register', {
       name: 'OpenAI Multimodal Agent',
@@ -198,7 +212,8 @@ export class AgentRevampSetup {
       },
       tools: [],
       memory: {
-        type: 'conversation_index'
+        type: "agentic_memory",
+        memory_container_id: memoryContainerId
       }
     });
 
@@ -209,6 +224,6 @@ export class AgentRevampSetup {
     const agentId = response.body.agent_id;
     console.log(`✓ OpenAI agent registered: ${agentId}\n`);
 
-    return agentId;
+    return { agentId, memoryContainerId };
   }
 }

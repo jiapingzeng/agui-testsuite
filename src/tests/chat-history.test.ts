@@ -1,13 +1,13 @@
 export const testConfig = {
-  name: 'List Tools',
+  name: 'Chat history',
   payload: {
-    threadId: 'thread-1',
-    runId: 'run-1',
+    threadId: 'thread-image-1',
+    runId: 'run-image-1',
     messages: [
       {
         id: 'msg-1',
         role: 'user',
-        content: 'what tools do you have'
+        content: 'what have I asked you previously'
       }
     ],
     tools: [],
