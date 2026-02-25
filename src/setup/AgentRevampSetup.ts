@@ -155,6 +155,7 @@ export class AgentRevampSetup {
       },
       parameters: {
         max_iteration: '50',
+        message_history_limit: '100',
         mcp_connectors: [
           {
             mcp_connector_id: mcpConnectorId
@@ -204,6 +205,7 @@ export class AgentRevampSetup {
       },
       parameters: {
         max_iteration: '50',
+        message_history_limit: '100',
         mcp_connectors: [
           {
             mcp_connector_id: mcpConnectorId
